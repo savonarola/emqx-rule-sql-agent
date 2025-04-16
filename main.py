@@ -1,5 +1,7 @@
 import asyncio
+import glob
 import logging
+from pathlib import Path
 
 import agents
 from agents import Agent, Runner
@@ -12,38 +14,46 @@ agents.run.RunConfig.tracing_disabled = True
 
 
 def instructions():
-    syntax = open("/Users/av/emqx/emqx-docs/en_US/data-integration/rule-sql-syntax.md").read()
+    doc_file_pattern = Path(__file__).parent.joinpath("rule-sql-context").joinpath("*.md")
+    print(doc_file_pattern)
+    rule_sql_doc_files = glob.glob(str(doc_file_pattern))
+    rule_sql_docs = [open(f).read() for f in rule_sql_doc_files]
+    syntax = "\n".join(rule_sql_docs)
 
     return f"""
     You help to compose an SQL statement for the EMQX Rule Engine.
 
-    The rules for the SQL statements are as follows:
+    The following are the documents for the SQL statements:
     {syntax}
     """
 
 
 def extend_prompt(user_input: str):
     return f"""
-    Please help to compose an SQL statement for the EMQX Rule Engine.
+    Please help to compose an SQL statement for the EMQX Rule Engine:
     {user_input}
 
     Use the validate_sql tool to validate the SQL statement before providing the final answer.
+    Use the 
 
     For validation with validate_sql tool, provide samples that are expected to match
     and samples that are expected to not match the SQL statement.
 
-    In case of success, provide the final SQL statement only, without any additional text.
+    In case of composing an SQL statement, provide concise answer, without any additional text.
     """
 
 
 async def run(mcp_server: MCPServer, instructions: str):
-    session = PromptSession(message="rule-sql-agent> ")
+    session = PromptSession(
+        message="rule-sql-agent> "
+    )
 
     # Get all the topics from the EMQX server
     agent = Agent(
         name="Assistant",
         instructions=instructions,
         mcp_servers=[mcp_server],
+        model="gpt-4o",
     )
 
     agent_input = []
