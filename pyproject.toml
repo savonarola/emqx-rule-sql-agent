@@ -9,5 +9,10 @@ dependencies = [
     "prompt-toolkit"
 ]
 
+[project.scripts]
+emqx-rule-sql-agent = "main:main"
+
 [tool.black]
 line-length = 120
+
+

@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import glob
 import logging
@@ -43,7 +44,7 @@ def extend_prompt(user_input: str):
     """
 
 
-async def run(mcp_server: MCPServer, instructions: str):
+async def run(mcp_server: MCPServer, instructions: str, args: argparse.Namespace):
     session = PromptSession(
         message="rule-sql-agent> "
     )
@@ -53,7 +54,7 @@ async def run(mcp_server: MCPServer, instructions: str):
         name="Assistant",
         instructions=instructions,
         mcp_servers=[mcp_server],
-        model="gpt-4o",
+        model=args.model,
     )
 
     agent_input = []
@@ -67,29 +68,47 @@ async def run(mcp_server: MCPServer, instructions: str):
         agent_input = result.to_input_list()
 
 
-async def main(instructions: str):
+def main():
+    parser = argparse.ArgumentParser("EMQX Rule SQL Agent")
+    parser.add_argument("--model", type=str, default="gpt-4o")
+    parser.add_argument("--emqx-mcp-server-dir", type=dir_path, required=True)
+    parser.add_argument("--emqx-api-url", type=str, default="http://localhost:18083/api/v5")
+    parser.add_argument("--emqx-api-key", type=str, default="key")
+    parser.add_argument("--emqx-api-secret", type=str, default="secret")
+
+    args = parser.parse_args()
+    try:
+        asyncio.run(run_mcp_server(instructions(), args))
+    except KeyboardInterrupt:
+        print("Goodbye!")
+
+
+async def run_mcp_server(instructions: str, args: argparse.Namespace):
     async with MCPServerStdio(
         name="EMQX helper server",
         params={
             "command": "uv",
             "args": [
                 "--directory",
-                "/Users/av/emqx/emqx-mcp-server",
+                args.emqx_mcp_server_dir,
                 "run",
                 "emqx-mcp-server",
             ],
             "env": {
-                "EMQX_API_URL": "http://localhost:18083/api/v5",
-                "EMQX_API_KEY": "key",
-                "EMQX_API_SECRET": "secret",
+                "EMQX_API_URL": args.emqx_api_url,
+                "EMQX_API_KEY": args.emqx_api_key,
+                "EMQX_API_SECRET": args.emqx_api_secret,
             },
         },
     ) as server:
-        await run(server, instructions)
+        await run(server, instructions, args)
 
+def dir_path(path_str):
+    path = Path(path_str)
+    if path.is_dir():
+        return str(path)
+    else:
+        raise argparse.ArgumentTypeError(f"'{path_str}' is not a valid directory")
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main(instructions()))
-    except KeyboardInterrupt:
-        print("Goodbye!")
+    main()
